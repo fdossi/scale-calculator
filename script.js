@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getImageDimensions() {
-        if (currentTiffImage) {
+        if (currentTiffImage && currentTiffImage.width && currentTiffImage.height) {
             return { width: currentTiffImage.width, height: currentTiffImage.height };
         }
         if (currentImage) {
@@ -123,15 +123,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const { width, height } = getImageDimensions();
         if (!width || !height) return;
 
-        const imgToDraw = currentImage || currentTiffImage;
-
-        // Ajusta o tamanho do canvas HTML para o tamanho do container visível
         const parentContainer = imageCanvas.parentElement;
-        const containerWidth = parentContainer.offsetWidth;
-        const containerHeight = Math.min(500, height);
+        const containerWidth = parentContainer.offsetWidth || width;
+        const widthScale = containerWidth / width;
+        const heightScale = 500 / height;
+        let scaleToFit = Math.min(widthScale, heightScale);
+        if (!Number.isFinite(scaleToFit) || scaleToFit <= 0) {
+            scaleToFit = 1;
+        }
 
-        imageCanvas.style.width = `${containerWidth}px`;
-        imageCanvas.style.height = `${containerHeight}px`;
+        const displayWidth = Math.max(1, Math.round(width * scaleToFit));
+        const displayHeight = Math.max(1, Math.round(height * scaleToFit));
+
+        imageCanvas.style.width = `${displayWidth}px`;
+        imageCanvas.style.height = `${displayHeight}px`;
 
         imageCanvas.width = width;
         imageCanvas.height = height;
@@ -142,24 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.translate(panX, panY);
         ctx.scale(scale, scale);
 
-        // Se for uma imagem Tiff decodificada (Array de pixels), desenha-a manualmente
-        if (currentTiffImage && currentTiffImage.data) {
-             const imageData = ctx.createImageData(currentTiffImage.width, currentTiffImage.height);
-             // currentTiffImage.data já deve ser um Uint8ClampedArray no formato RGBA
-             // Se for apenas RGB, precisamos converter
-             if (currentTiffImage.data.length === currentTiffImage.width * currentTiffImage.height * 3) {
-                for (let i = 0, j = 0; i < currentTiffImage.data.length; i += 3, j += 4) {
-                    imageData.data[j] = currentTiffImage.data[i];
-                    imageData.data[j + 1] = currentTiffImage.data[i + 1];
-                    imageData.data[j + 2] = currentTiffImage.data[i + 2];
-                    imageData.data[j + 3] = 255; // Alpha channel
-                }
-             } else { // Assume que já é RGBA
-                imageData.data.set(currentTiffImage.data);
-             }
-            ctx.putImageData(imageData, 0, 0);
-        } else { // Imagem nativa do navegador (JPG, PNG, etc.)
-            ctx.drawImage(imgToDraw, 0, 0);
+        if (currentTiffImage && (currentTiffImage.bitmap || currentTiffImage.canvas)) {
+            const tiffSource = currentTiffImage.bitmap || currentTiffImage.canvas;
+            ctx.drawImage(tiffSource, 0, 0);
+        } else if (currentImage) {
+            ctx.drawImage(currentImage, 0, 0);
         }
 
         if (currentMeasurementMode !== 'useImageWidth' && startPoint.x !== undefined && endPoint.x !== undefined) {
@@ -232,6 +224,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadImageFile(file) {
         hideMessage(errorMessage);
         showLoadingOverlay('Carregando imagem...');
+
+        if (currentTiffImage && currentTiffImage.bitmap && typeof currentTiffImage.bitmap.close === 'function') {
+            currentTiffImage.bitmap.close();
+        }
+
         currentImage = null; // Limpa imagem nativa
         currentTiffImage = null; // Limpa imagem tiff
 
@@ -248,16 +245,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateLoadingProgress(null);
                 // Leitura do arquivo binário para Tiff.js
                 const arrayBuffer = await file.arrayBuffer();
-                const tiff = Tiff({ buffer: arrayBuffer });
+                const tiff = new Tiff({ buffer: arrayBuffer });
                 const width = tiff.width();
                 const height = tiff.height();
-                // Assume a primeira imagem no TIFF
-                const rgbaData = tiff.readRGBAImage(); // Retorna Uint8ClampedArray
-                
+                const rgbaData = tiff.readRGBAImage();
+
+                let bitmap = null;
+                let fallbackCanvas = null;
+
+                const clampedArray = rgbaData instanceof Uint8ClampedArray ? rgbaData : new Uint8ClampedArray(rgbaData);
+                let imageData;
+                if (typeof ImageData === 'function') {
+                    imageData = new ImageData(clampedArray, width, height);
+                } else {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    imageData = tempCtx.createImageData(width, height);
+                    imageData.data.set(clampedArray);
+                }
+
+                if (typeof createImageBitmap === 'function') {
+                    try {
+                        bitmap = await createImageBitmap(imageData);
+                    } catch (bitmapError) {
+                        console.warn('Falha ao criar ImageBitmap para TIFF, usando canvas auxiliar.', bitmapError);
+                    }
+                }
+
+                if (!bitmap) {
+                    fallbackCanvas = document.createElement('canvas');
+                    fallbackCanvas.width = width;
+                    fallbackCanvas.height = height;
+                    const offscreenCtx = fallbackCanvas.getContext('2d');
+                    offscreenCtx.putImageData(imageData, 0, 0);
+                }
+
+                if (typeof tiff.close === 'function') {
+                    tiff.close();
+                }
+
                 currentTiffImage = {
-                    width: width,
-                    height: height,
-                    data: rgbaData
+                    width,
+                    height,
+                    bitmap,
+                    canvas: fallbackCanvas
                 };
             } catch (error) {
                 console.error("Erro ao decodificar TIFF:", error);
@@ -414,6 +447,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return { x: imageX, y: imageY };
     }
 
+    function getEventCanvasPosition(event) {
+        const rect = imageCanvas.getBoundingClientRect();
+        const scaleX = rect.width ? imageCanvas.width / rect.width : 1;
+        const scaleY = rect.height ? imageCanvas.height / rect.height : 1;
+        const canvasX = (event.clientX - rect.left) * scaleX;
+        const canvasY = (event.clientY - rect.top) * scaleY;
+        return { x: canvasX, y: canvasY };
+    }
+
     // --- Manipuladores de Eventos ---
 
     // Upload de Imagem
@@ -450,21 +492,19 @@ document.addEventListener('DOMContentLoaded', () => {
     imageCanvas.addEventListener('mousedown', (e) => {
         if (!currentImage && !currentTiffImage) return;
 
-        const rect = imageCanvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        const canvasPoint = getEventCanvasPosition(e);
 
-        if (currentMeasurementMode !== 'useImageWidth' && (e.button === 0)) {
+        if (currentMeasurementMode !== 'useImageWidth' && e.button === 0) {
             resetMeasurement();
             isDrawing = true;
-            startPoint = getCanvasToImageCoords(mouseX, mouseY);
+            startPoint = getCanvasToImageCoords(canvasPoint.x, canvasPoint.y);
             endPoint = { x: startPoint.x, y: startPoint.y };
             imageCanvas.style.cursor = 'grabbing';
             e.preventDefault();
         } else if (e.button === 2 || e.button === 1 || (e.button === 0 && !isDrawing)) {
             isPanning = true;
-            lastPanX = e.clientX;
-            lastPanY = e.clientY;
+            lastPanX = canvasPoint.x;
+            lastPanY = canvasPoint.y;
             imageCanvas.style.cursor = 'grabbing';
             e.preventDefault();
         }
@@ -473,16 +513,13 @@ document.addEventListener('DOMContentLoaded', () => {
     imageCanvas.addEventListener('mousemove', (e) => {
         if (!currentImage && !currentTiffImage) return;
 
-        const rect = imageCanvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const imgCoords = getCanvasToImageCoords(mouseX, mouseY);
+        const canvasPoint = getEventCanvasPosition(e);
+        const imgCoords = getCanvasToImageCoords(canvasPoint.x, canvasPoint.y);
         coordinatesDisplay.textContent = `X:${Math.round(imgCoords.x)} Y:${Math.round(imgCoords.y)}`;
         coordinatesDisplay.style.display = 'block';
 
         if (isDrawing && currentMeasurementMode !== 'useImageWidth') {
-            let currentImgCoords = getCanvasToImageCoords(mouseX, mouseY);
+            let currentImgCoords = getCanvasToImageCoords(canvasPoint.x, canvasPoint.y);
 
             if (e.shiftKey) {
                 const dx = Math.abs(currentImgCoords.x - startPoint.x);
@@ -502,12 +539,12 @@ document.addEventListener('DOMContentLoaded', () => {
             measurementInfo.textContent = `Linha de medição: ${measuredPixels.toFixed(2)} pixels`;
             drawImage();
         } else if (isPanning) {
-            const dx = e.clientX - lastPanX;
-            const dy = e.clientY - lastPanY;
+            const dx = canvasPoint.x - lastPanX;
+            const dy = canvasPoint.y - lastPanY;
             panX += dx;
             panY += dy;
-            lastPanX = e.clientX;
-            lastPanY = e.clientY;
+            lastPanX = canvasPoint.x;
+            lastPanY = canvasPoint.y;
             drawImage();
         }
     });
@@ -542,9 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
 
         const zoomFactor = 1.1;
-        const rect = imageCanvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        const canvasPoint = getEventCanvasPosition(e);
 
         const oldScale = scale;
         if (e.deltaY < 0) {
@@ -555,11 +590,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         scale = Math.max(0.1, Math.min(scale, 10.0));
 
-        const imgMouseX = (mouseX - panX) / oldScale;
-        const imgMouseY = (mouseY - panY) / oldScale;
+        const imgMouseX = (canvasPoint.x - panX) / oldScale;
+        const imgMouseY = (canvasPoint.y - panY) / oldScale;
 
-        panX = mouseX - (imgMouseX * scale);
-        panY = mouseY - (imgMouseY * scale);
+        panX = canvasPoint.x - (imgMouseX * scale);
+        panY = canvasPoint.y - (imgMouseY * scale);
 
         updateZoomLevel();
         drawImage();
