@@ -1,0 +1,345 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #eef1f5;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    max-width: 900px;
+    width: 100%;
+    box-sizing: border-box;
+    animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+h1 {
+    color: #004085;
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 2.2em;
+    font-weight: 600;
+}
+
+h2 {
+    color: #0056b3;
+    border-bottom: 1px solid #e0e6ec;
+    padding-bottom: 10px;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    font-size: 1.6em;
+}
+
+.card {
+    background-color: #f9fcff;
+    border: 1px solid #d1e2f1;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #a0c4e0;
+    border-radius: 6px;
+    box-sizing: border-box;
+    background-color: #e9f5ff;
+}
+
+input[type="number"], select {
+    padding: 10px;
+    border: 1px solid #a0c4e0;
+    border-radius: 5px;
+    margin-left: 10px;
+    font-size: 0.95em;
+    background-color: #fff;
+    vertical-align: middle; /* Alinha com o label */
+}
+
+label {
+    margin-top: 15px;
+    display: inline-block;
+    font-weight: 500;
+    color: #444;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.05em;
+    margin-top: 20px;
+    margin-right: 10px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+}
+
+button.active {
+    background-color: #28a745;
+}
+
+button.active:hover {
+    background-color: #218838;
+}
+
+.message {
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-top: 15px;
+    font-size: 0.9em;
+    display: none;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.info-text {
+    font-style: italic;
+    color: #555;
+    margin-top: 15px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.small-text {
+    font-size: 0.85em;
+    color: #777;
+    margin-top: 10px;
+    text-align: center;
+}
+
+footer {
+    text-align: center;
+    margin-top: 30px;
+    font-size: 0.9em;
+    color: #888;
+}
+
+.measurement-options {
+    display: flex;
+    flex-wrap: wrap; /* Permite que os botões quebrem a linha em telas pequenas */
+    gap: 10px; /* Espaçamento entre os botões */
+    margin-bottom: 20px;
+}
+
+.measurement-options button {
+    flex-grow: 1; /* Permite que os botões preencham o espaço */
+    margin-top: 0; /* Ajusta a margem superior */
+}
+
+#scaleInputGroup, #imageWidthInputGroup {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #cfe2ff;
+    border-radius: 8px;
+    background-color: #e9f5ff;
+}
+
+#scaleInputGroup label, #imageWidthInputGroup label {
+    display: inline-block; /* Mantém label e input na mesma linha */
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+#resultSection p {
+    font-size: 1.2em;
+    text-align: center;
+    margin-top: 15px;
+}
+
+#resultValue {
+    color: #007bff;
+    font-size: 1.4em;
+}
+
+/* Canvas Controls (Zoom/Pan) */
+#canvasControls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 15px;
+    gap: 10px;
+    background-color: #e0f0ff;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #b3d7ff;
+    flex-wrap: wrap; /* Para responsividade */
+}
+
+#canvasControls button {
+    margin: 0;
+    min-width: 35px; /* Tamanho mínimo para botões pequenos */
+    height: 35px;
+    font-size: 1.2em;
+    padding: 0;
+    background-color: #007bff;
+    line-height: 1; /* Centraliza o texto */
+}
+
+#canvasControls button:hover {
+    background-color: #0056b3;
+}
+
+.zoom-level {
+    font-weight: bold;
+    color: #004085;
+    margin-left: 10px;
+}
+
+/* Canvas e Loading Overlay */
+#canvasContainer {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    border: 1px solid #b3d7ff;
+    background-color: #e0f0ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    height: auto;
+    min-height: 200px; /* Garante que o container não suma */
+    cursor: grab;
+}
+
+#imageCanvas {
+    display: block;
+    max-width: 100%;
+    max-height: 500px; /* Altura máxima para não estourar a tela */
+    /* Cursor é definido dinamicamente via JS */
+}
+
+#loadingOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-size: 1.2em;
+    color: #555;
+    z-index: 10;
+    display: none;
+    border-radius: 8px;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Coordenadas do mouse */
+.coordinates-display {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    z-index: 11;
+    display: none; /* Inicia oculto */
+}
+
+/* ... seu CSS existente ... */
+
+.tiff-option {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #cce5ff;
+    border-radius: 8px;
+    background-color: #e6f7ff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tiff-option label {
+    margin: 0;
+    font-weight: normal;
+    color: #004085;
+}
+
+.tiff-option input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #007bff; /* Cor do checkbox */
+    cursor: pointer;
+}
+
+.message.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Ajustes para responsividade de inputs */
+#scaleInputGroup input, #scaleInputGroup select,
+#imageWidthInputGroup input, #imageWidthInputGroup select {
+    width: auto; /* Permite que os inputs e selects se ajustem */
+    max-width: calc(100% - 100px); /* Evita que estoure em telas pequenas */
+    margin-left: 0; /* Remove margem extra */
+    margin-right: 5px;
+}
+
+#scaleInputGroup label, #imageWidthInputGroup label {
+    margin-bottom: 5px; /* Ajusta espaçamento */
+    font-weight: bold;
+    display: block; /* Garante que o label fique acima em telas pequenas */
+}
+
+@media (min-width: 600px) {
+    #scaleInputGroup label, #imageWidthInputGroup label {
+        display: inline-block; /* Volta ao normal em telas maiores */
+        margin-bottom: 0;
+    }
+}
+
+/* ... restante do seu CSS ... */

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Escala de Imagem SEM</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Escala de Imagem SEM</h1>
+        <p>Faça o upload de uma imagem com barra de escala para calcular o fator µm/pixel.</p>
+
+        <div class="card">
+            <h2>1. Carregar Imagem</h2>
+            <input type="file" id="imageUpload" accept="image/jpeg, image/png, image/gif, image/bmp, image/webp, .tif, .tiff">
+            <p class="small-text"><i>Formatos aceitos: JPG, PNG, GIF, BMP, WEBP. Para TIF/TIFF, ative a opção abaixo.</i></p>
+            
+            <div class="tiff-option">
+                <input type="checkbox" id="enableTiffSupport">
+                <label for="enableTiffSupport">Habilitar suporte a TIF/TIFF (carrega módulo adicional)</label>
+                <div id="tiffLoadingMessage" class="message info-message" style="display: none;">Carregando módulo TIF, aguarde...</div>
+                <div id="tiffSupportMessage" class="message success-message" style="display: none;">Suporte a TIF/TIFF ativado!</div>
+            </div>
+
+            <div id="errorMessage" class="message error-message" style="display: none;"></div>
+        </div>
+
+        <div class="card" id="measurementSection" style="display: none;">
+            <h2>2. Medir a Escala</h2>
+            <div class="measurement-options">
+                <button id="measureToolBtn" class="active">Medir Barra de Escala</button>
+                <button id="measureObjectBtn">Medir Objeto (conhecido)</button>
+                <button id="useImageWidthBtn">Usar Largura da Imagem</button>
+            </div>
+
+            <div id="canvasControls" style="display: none;">
+                <button id="zoomInBtn" title="Zoom In">+</button>
+                <button id="zoomOutBtn" title="Zoom Out">-</button>
+                <button id="resetViewBtn" title="Resetar Visualização">⟳</button>
+                <button id="clearMeasurementBtn" title="Limpar Medição Atual">Ø Medição</button>
+                <span class="zoom-level">Zoom: <span id="currentZoom">100%</span></span>
+            </div>
+
+            <div id="canvasContainer">
+                <canvas id="imageCanvas"></canvas>
+                <div id="loadingOverlay">
+                    <div class="spinner"></div>
+                    Carregando imagem...
+                </div>
+                <div id="coordinatesDisplay" class="coordinates-display">X:0 Y:0</div>
+            </div>
+            <p id="measurementInfo" class="info-text"></p>
+            <p class="small-text"><i>Com as ferramentas "Medir Barra" ou "Medir Objeto" ativas, clique e arraste para medir em pixels (segure `Shift` para linhas retas). <br>Use o scroll do mouse ou os botões para zoom/pan. <br> Clique direito ou arraste com o botão do meio do mouse para pan.</i></p>
+
+            <div id="scaleInputGroup">
+                <label for="scaleValue">Valor real da medida:</label>
+                <input type="number" id="scaleValue" value="50" min="0" step="any">
+                <select id="scaleUnit">
+                    <option value="nm">nanômetros (nm)</option>
+                    <option value="um" selected>micrômetros (µm)</option>
+                    <option value="mm">milímetros (mm)</option>
+                </select>
+                <div id="scaleValueError" class="message error-message" style="display: none;"></div>
+            </div>
+
+            <div id="imageWidthInputGroup" style="display: none;">
+                <label for="imageWidthValue">Valor real da largura total da imagem:</label>
+                <input type="number" id="imageWidthValue" value="" min="0" step="any">
+                <select id="imageWidthUnit">
+                    <option value="nm">nanômetros (nm)</option>
+                    <option value="um" selected>micrômetros (µm)</option>
+                    <option value="mm">milímetros (mm)</option>
+                </select>
+                <div id="imageWidthValueError" class="message error-message" style="display: none;"></div>
+            </div>
+
+            <button id="calculateBtn">Calcular µm/pixel</button>
+        </div>
+
+        <div class="card" id="resultSection" style="display: none;">
+            <h2>3. Resultado</h2>
+            <p>Seu fator de escala é: <strong id="resultValue"></strong></p>
+            <button id="downloadTxtBtn">Baixar Resultado (.txt)</button>
+        </div>
+
+        <footer>
+            <p>Desenvolvido para análise de imagens científicas.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
