@@ -13,7 +13,10 @@
 
         <div class="card">
             <h2>1. Carregar Imagem</h2>
-            <input type="file" id="imageUpload" accept="image/jpeg, image/png, image/gif, image/bmp, image/webp, .tif, .tiff">
+            <div class="upload-controls">
+                <input type="file" id="imageUpload" accept="image/jpeg, image/png, image/gif, image/bmp, image/webp, .tif, .tiff">
+                <button type="button" id="attachImageBtn">Anexar imagem</button>
+            </div>
             <p class="small-text"><i>Formatos aceitos: JPG, PNG, GIF, BMP, WEBP. Para TIF/TIFF, ative a opção abaixo.</i></p>
             
             <div class="tiff-option">
@@ -46,7 +49,10 @@
                 <canvas id="imageCanvas"></canvas>
                 <div id="loadingOverlay">
                     <div class="spinner"></div>
-                    Carregando imagem...
+                    <div id="loadingText">Carregando imagem...</div>
+                    <div id="uploadProgress" class="progress-container" style="display: none;">
+                        <div id="uploadProgressBar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+                    </div>
                 </div>
                 <div id="coordinatesDisplay" class="coordinates-display">X:0 Y:0</div>
             </div>

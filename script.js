@@ -12,7 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultValueSpan = document.getElementById('resultValue');
     const downloadTxtBtn = document.getElementById('downloadTxtBtn');
     const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
     const errorMessage = document.getElementById('errorMessage');
+
+    const attachImageBtn = document.getElementById('attachImageBtn');
 
     const measureToolBtn = document.getElementById('measureToolBtn');
     const measureObjectBtn = document.getElementById('measureObjectBtn');
@@ -69,10 +74,24 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Funções de Ajuda de UI ---
-    function showMessage(element, message, isError = false) {
+    function showMessage(element, message, type = 'info') {
+        let resolvedType = type;
+
+        if (typeof type === 'boolean') {
+            resolvedType = type ? 'error' : 'success';
+        }
+
         element.textContent = message;
-        element.className = `message ${isError ? 'error-message' : 'info-text'}`;
-        if (!isError) element.classList.add('success-message'); // Adiciona classe para info/success
+        element.className = 'message';
+
+        if (resolvedType === 'error') {
+            element.classList.add('error-message');
+        } else if (resolvedType === 'success') {
+            element.classList.add('success-message');
+        } else {
+            element.classList.add('info-text');
+        }
+
         element.style.display = 'block';
     }
 
@@ -86,21 +105,36 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
     }
 
+    function getImageDimensions() {
+        if (currentTiffImage) {
+            return { width: currentTiffImage.width, height: currentTiffImage.height };
+        }
+        if (currentImage) {
+            const width = currentImage.naturalWidth || currentImage.width;
+            const height = currentImage.naturalHeight || currentImage.height;
+            return { width, height };
+        }
+        return { width: 0, height: 0 };
+    }
+
     function drawImage() {
         if (!currentImage && !currentTiffImage) return;
+
+        const { width, height } = getImageDimensions();
+        if (!width || !height) return;
 
         const imgToDraw = currentImage || currentTiffImage;
 
         // Ajusta o tamanho do canvas HTML para o tamanho do container visível
         const parentContainer = imageCanvas.parentElement;
         const containerWidth = parentContainer.offsetWidth;
-        const containerHeight = Math.min(500, imgToDraw.height);
+        const containerHeight = Math.min(500, height);
 
         imageCanvas.style.width = `${containerWidth}px`;
         imageCanvas.style.height = `${containerHeight}px`;
 
-        imageCanvas.width = imgToDraw.width;
-        imageCanvas.height = imgToDraw.height;
+        imageCanvas.width = width;
+        imageCanvas.height = height;
 
         clearCanvas();
         ctx.save();
@@ -162,21 +196,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Lógica de Carregamento e Inicialização ---
+    function updateLoadingMessage(message) {
+        if (loadingText) {
+            loadingText.textContent = message;
+        }
+    }
+
+    function updateLoadingProgress(percent) {
+        if (!uploadProgress || !uploadProgressBar) return;
+
+        if (typeof percent === 'number' && !Number.isNaN(percent)) {
+            const clamped = Math.min(100, Math.max(0, percent));
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = `${clamped}%`;
+            uploadProgressBar.setAttribute('aria-valuenow', clamped);
+        } else {
+            uploadProgress.style.display = 'none';
+            uploadProgressBar.style.width = '0%';
+            uploadProgressBar.setAttribute('aria-valuenow', 0);
+        }
+    }
+
+    function showLoadingOverlay(message = 'Carregando imagem...') {
+        updateLoadingMessage(message);
+        updateLoadingProgress(0);
+        loadingOverlay.style.display = 'flex';
+    }
+
+    function hideLoadingOverlay() {
+        loadingOverlay.style.display = 'none';
+        updateLoadingProgress(null);
+        updateLoadingMessage('Carregando imagem...');
+    }
+
     async function loadImageFile(file) {
         hideMessage(errorMessage);
-        loadingOverlay.style.display = 'flex';
+        showLoadingOverlay('Carregando imagem...');
         currentImage = null; // Limpa imagem nativa
         currentTiffImage = null; // Limpa imagem tiff
 
         const fileExtension = file.name.split('.').pop().toLowerCase();
-        
+
         if (fileExtension === 'tif' || fileExtension === 'tiff') {
             if (!tiffModuleLoaded) {
                 showMessage(errorMessage, 'Suporte a TIF/TIFF não está ativado. Por favor, marque a caixa "Habilitar suporte a TIF/TIFF" e tente novamente.', true);
-                loadingOverlay.style.display = 'none';
+                hideLoadingOverlay();
                 return;
             }
             try {
+                updateLoadingMessage('Processando arquivo TIFF...');
+                updateLoadingProgress(null);
                 // Leitura do arquivo binário para Tiff.js
                 const arrayBuffer = await file.arrayBuffer();
                 const tiff = Tiff({ buffer: arrayBuffer });
@@ -193,56 +262,92 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Erro ao decodificar TIFF:", error);
                 showMessage(errorMessage, `Não foi possível ler o arquivo TIFF. Ele pode ser um formato não suportado ou estar corrompido. Erro: ${error.message}`, true);
-                loadingOverlay.style.display = 'none';
+                hideLoadingOverlay();
                 return;
             }
 
         } else { // Formatos nativos do navegador
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        currentImage = img;
-                        resolve();
+            try {
+                await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadstart = () => {
+                        updateLoadingMessage('Lendo arquivo da imagem...');
+                        updateLoadingProgress(0);
                     };
-                    img.onerror = () => {
-                        reject('Erro ao carregar a imagem. Verifique o formato ou se o arquivo está corrompido.');
+                    reader.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const percent = Math.round((event.loaded / event.total) * 100);
+                            updateLoadingMessage(`Lendo arquivo da imagem... ${percent}%`);
+                            updateLoadingProgress(percent);
+                        } else {
+                            updateLoadingProgress(null);
+                        }
                     };
-                    img.src = event.target.result;
-                };
-                reader.onerror = () => {
-                    reject('Erro ao ler o arquivo.');
-                };
-                reader.readAsDataURL(file);
-            });
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            updateLoadingMessage('Processando imagem...');
+                            updateLoadingProgress(100);
+                            currentImage = img;
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            reject(new Error('Erro ao carregar a imagem. Verifique o formato ou se o arquivo está corrompido.'));
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.onerror = () => {
+                        reject(new Error('Erro ao ler o arquivo.'));
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar a imagem:', error);
+                const errorText = error instanceof Error ? error.message : 'Erro ao carregar a imagem.';
+                showMessage(errorMessage, errorText, true);
+                hideLoadingOverlay();
+                return;
+            }
         }
-        
+
         // Finaliza o carregamento comum para ambos os tipos de imagem
-        const imgToDraw = currentImage || currentTiffImage;
-        imageCanvas.width = imgToDraw.width;
-        imageCanvas.height = imgToDraw.height;
+        const { width, height } = getImageDimensions();
+        if (!width || !height) {
+            showMessage(errorMessage, 'Não foi possível determinar as dimensões da imagem carregada.', true);
+            hideLoadingOverlay();
+            return;
+        }
+        imageCanvas.width = width;
+        imageCanvas.height = height;
 
         resetView();
-        drawImage();
-        
+
         measurementSection.style.display = 'block';
         canvasControls.style.display = 'flex';
         resultSection.style.display = 'none';
         resetMeasurement();
-        loadingOverlay.style.display = 'none';
+        hideLoadingOverlay();
         imageWidthValueInput.value = '';
 
         if (currentMeasurementMode === 'useImageWidth') {
-            measurementInfo.textContent = `Largura da imagem: ${imgToDraw.width} pixels`;
+            measurementInfo.textContent = `Largura da imagem: ${width} pixels`;
         }
+
+        imageUpload.value = '';
+
+        showMessage(errorMessage, 'Imagem carregada com sucesso!', 'success');
     }
 
     function resetMeasurement() {
         startPoint = { x: undefined, y: undefined };
         endPoint = { x: undefined, y: undefined };
         measuredPixels = 0;
-        measurementInfo.textContent = '';
+        if (currentMeasurementMode === 'useImageWidth') {
+            const { width } = getImageDimensions();
+            measurementInfo.textContent = width ? `Largura da imagem: ${width} pixels` : '';
+        } else {
+            measurementInfo.textContent = '';
+        }
         drawImage();
 
         updateCanvasCursor();
@@ -312,18 +417,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Manipuladores de Eventos ---
 
     // Upload de Imagem
+    if (attachImageBtn) {
+        attachImageBtn.addEventListener('click', () => {
+            imageUpload.click();
+        });
+    }
+
     imageUpload.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
             const fileExtension = file.name.split('.').pop().toLowerCase();
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+            const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+            const isTiff = fileExtension === 'tif' || fileExtension === 'tiff';
+            const hasAllowedMime = allowedTypes.includes(file.type);
+            const hasAllowedExtension = allowedExtensions.includes(fileExtension);
 
-            if (!allowedTypes.includes(`image/${fileExtension}`) && fileExtension !== 'tif' && fileExtension !== 'tiff') {
+            if (!isTiff && !hasAllowedMime && !hasAllowedExtension) {
                 showMessage(errorMessage, `Formato de arquivo "${fileExtension}" não suportado. Por favor, use JPG, PNG, GIF, BMP, WEBP ou ative o suporte a TIF/TIFF.`, true);
                 e.target.value = '';
                 return;
             }
-            if ((fileExtension === 'tif' || fileExtension === 'tiff') && !tiffModuleLoaded) {
+            if (isTiff && !tiffModuleLoaded) {
                  showMessage(errorMessage, `Para abrir arquivos TIF/TIFF, você precisa ativar a opção "Habilitar suporte a TIF/TIFF" e aguardar o carregamento do módulo.`, true);
                  e.target.value = '';
                  return;
@@ -340,13 +455,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const mouseY = e.clientY - rect.top;
 
         if (currentMeasurementMode !== 'useImageWidth' && (e.button === 0)) {
+            resetMeasurement();
             isDrawing = true;
             startPoint = getCanvasToImageCoords(mouseX, mouseY);
             endPoint = { x: startPoint.x, y: startPoint.y };
             imageCanvas.style.cursor = 'grabbing';
             e.preventDefault();
-            resetMeasurement(); 
-        } else if (e.button === 2 || e.button === 1 || (e.button === 0 && !isDrawing)) { 
+        } else if (e.button === 2 || e.button === 1 || (e.button === 0 && !isDrawing)) {
             isPanning = true;
             lastPanX = e.clientX;
             lastPanY = e.clientY;
@@ -515,18 +630,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let realValue, unit, pixelsToUse;
         let isValid = true;
-        const imgDimensions = currentImage || currentTiffImage;
+        const hasImage = currentImage || currentTiffImage;
 
-        if (!imgDimensions) {
+        if (!hasImage) {
             showMessage(errorMessage, 'Por favor, carregue uma imagem primeiro.', true);
             return;
         }
+
+        const { width } = getImageDimensions();
 
         if (currentMeasurementMode === 'useImageWidth') {
             isValid = validateInput(imageWidthValueInput, imageWidthValueError);
             realValue = parseFloat(imageWidthValueInput.value);
             unit = imageWidthUnitSelect.value;
-            pixelsToUse = imgDimensions.width;
+            pixelsToUse = width;
             if (!isValid) return;
         } else { // 'measureTool' ou 'measureObject'
             isValid = validateInput(scaleValueInput, scaleValueError);
@@ -576,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tiffModuleLoaded) return; // Já carregado
 
         hideMessage(tiffSupportMessage);
-        showMessage(tiffLoadingMessage, 'Carregando módulo TIF, aguarde (pode levar alguns segundos)...');
+        showMessage(tiffLoadingMessage, 'Carregando módulo TIF, aguarde (pode levar alguns segundos)...', 'info');
 
         try {
             // Carrega o script principal de tiff.js
@@ -597,7 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             tiffModuleLoaded = true;
             hideMessage(tiffLoadingMessage);
-            showMessage(tiffSupportMessage, 'Suporte a TIF/TIFF ativado!', false); // Use false para info/success
+            showMessage(tiffSupportMessage, 'Suporte a TIF/TIFF ativado!', 'success');
         } catch (error) {
             console.error("Erro ao carregar módulo TIFF:", error);
             hideMessage(tiffLoadingMessage);
@@ -615,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Tiff = null; // Limpa a referência
             hideMessage(tiffLoadingMessage);
             hideMessage(tiffSupportMessage);
-            showMessage(errorMessage, 'Suporte a TIF/TIFF desativado. Recarregue a página ou limpe a imagem se ela for TIFF.', false); // Mensagem informativa
+            showMessage(errorMessage, 'Suporte a TIF/TIFF desativado. Recarregue a página ou limpe a imagem se ela for TIFF.', 'info'); // Mensagem informativa
         }
         saveSettings(); // Salva o estado do checkbox
     });
