@@ -89,7 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (resolvedType === 'success') {
             element.classList.add('success-message');
         } else {
+
             element.classList.add('info-message');
+
+           main
         }
 
         element.style.display = 'block';
@@ -303,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await new Promise((resolve, reject) => {
                     const reader = new FileReader();
+
                     reader.onloadstart = () => {
                         updateLoadingMessage('Lendo arquivo da imagem...');
                         updateLoadingProgress(0);
@@ -332,13 +336,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     reader.onerror = () => {
                         reject(new Error('Erro ao ler o arquivo.'));
                     };
+
+                    main
                     reader.readAsDataURL(file);
                 });
             } catch (error) {
                 console.error('Erro ao carregar a imagem:', error);
                 const errorText = error instanceof Error ? error.message : 'Erro ao carregar a imagem.';
                 showMessage(errorMessage, errorText, true);
+
                 hideLoadingOverlay();
+
+                main
                 return;
             }
         }
@@ -495,6 +504,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const canvasPoint = getEventCanvasPosition(e);
 
         if (currentMeasurementMode !== 'useImageWidth' && e.button === 0) {
+
+       
+            main
             resetMeasurement();
             isDrawing = true;
             startPoint = getCanvasToImageCoords(canvasPoint.x, canvasPoint.y);
