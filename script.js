@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (resolvedType === 'success') {
             element.classList.add('success-message');
         } else {
-            element.classList.add('info-text');
+            element.classList.add('info-message');
         }
 
         element.style.display = 'block';
