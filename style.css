@@ -67,6 +67,25 @@ input[type="file"] {
     background-color: #e9f5ff;
 }
 
+.upload-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.upload-controls input[type="file"] {
+    flex: 1 1 250px;
+    margin-bottom: 0;
+}
+
+#attachImageBtn {
+    margin-top: 0;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
 input[type="number"], select {
     padding: 10px;
     border: 1px solid #a0c4e0;
@@ -124,7 +143,9 @@ button.active:hover {
     border: 1px solid #f5c6cb;
 }
 
-.message.info-text {
+
+.message.info-message {
+main
     background-color: #d1ecf1;
     color: #0c5460;
     border: 1px solid #bee5eb;
@@ -264,6 +285,27 @@ footer {
     z-index: 10;
     display: none;
     border-radius: 8px;
+}
+
+#loadingText {
+    text-align: center;
+}
+
+.progress-container {
+    width: 80%;
+    max-width: 280px;
+    height: 8px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    background-color: #28a745;
+    transition: width 0.3s ease;
 }
 
 .spinner {
